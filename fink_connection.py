@@ -9,7 +9,13 @@ from fink_client.consumer import AlertConsumer
 
 load_dotenv()
 
-SN_IA_CLASSES = {"SN Ia", "Early SN Ia candidate", "SN candidate"}
+SN_IA_TNS_CLASSES = {
+    "SN Ia",
+    "SN Ia-91T-like",
+    "SN Ia-91bg-like",
+    "SN Iax[02cx-like]",
+}
+SNN_SNIA_THRESHOLD = 0.5  # snn_snia_vs_nonia probability cutoff when TNS class is missing
 
 POLL_TIMEOUT_SECONDS = 10
 MAX_ALERTS = None  # None = run until interrupted
@@ -17,7 +23,7 @@ MAX_ALERTS = None  # None = run until interrupted
 
 def build_config() -> dict:
     """Read Fink broker credentials from environment variables."""
-    required = ["FINK_USERNAME", "FINK_PASSWORD", "FINK_SERVERS", "FINK_GROUP_ID"]
+    required = ["FINK_USERNAME", "FINK_SERVERS", "FINK_GROUP_ID"]
     missing = [name for name in required if not os.getenv(name)]
     if missing:
         raise RuntimeError(
@@ -27,25 +33,30 @@ def build_config() -> dict:
 
     return {
         "username": os.environ["FINK_USERNAME"],
-        "password": os.environ["FINK_PASSWORD"],
         "bootstrap.servers": os.environ["FINK_SERVERS"],
-        "group_id": os.environ["FINK_GROUP_ID"],
+        "group.id": os.environ["FINK_GROUP_ID"],
     }
 
 
 def is_sn_ia(alert: dict) -> bool:
-    """Return True if the alert is classified as a Type Ia supernova candidate."""
-    classification = alert.get("cdsxmatch") or alert.get("classification")
-    finkclass = alert.get("finkclass")
-    return classification in SN_IA_CLASSES or finkclass in SN_IA_CLASSES
+    """Return True if the alert is classified as a Type Ia supernova candidate.
+
+    Prefers TNS spectroscopic class when present (definitive); otherwise falls
+    back to Fink's SuperNNova Ia-vs-non-Ia probability.
+    """
+    tns = alert.get("tns")
+    if tns and tns not in {"nan", ""}:
+        return tns in SN_IA_TNS_CLASSES
+    return (alert.get("snn_snia_vs_nonia") or 0.0) >= SNN_SNIA_THRESHOLD
 
 
 def stream_alerts() -> None:
     config = build_config()
     topics = os.getenv("FINK_TOPICS", "fink_sn_candidates_ztf").split(",")
+    survey = os.getenv("FINK_SURVEY", "ztf")
 
-    consumer = AlertConsumer(topics, config)
-    print(f"Subscribed to topics: {topics}", file=sys.stderr)
+    consumer = AlertConsumer(topics, config, survey=survey)
+    print(f"Subscribed to topics: {topics} (survey={survey})", file=sys.stderr)
 
     seen = 0
     try:
