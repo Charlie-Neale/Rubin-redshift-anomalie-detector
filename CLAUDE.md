@@ -111,9 +111,31 @@ Note: Fink uses SASL but does not issue passwords for public ZTF topics — `FIN
 Build in this order — do not skip ahead:
 
 1. **fink_connection.py** — ✅ done. Connects to Fink stream, filters SN Ia, prints raw alerts.
-2. **physics_engine.py** — Standalone module, testable with a hardcoded sample alert. No I/O dependencies.
-3. **nightly_runner.py** — Calls fink_connection + physics_engine, opens GitHub issue if anomaly detected.
-4. **dashboard.py + visualise.py** — Streamlit app, only after data pipeline is confirmed working.
+2. **physics_engine.py + redshift_resolver.py** — ✅ done. Pure-math standard-candle and Mangrove host-z resolver.
+3. **nightly_runner.py** (+ light_curve.py, github_issues.py, anomaly_log.py) — ✅ done. End-to-end: stream → Ia filter → light-curve peak detection → host-z resolve → anomaly check → GitHub issue + CSV.
+4. **dashboard.py + visualise.py** — ✅ done. Streamlit app reading `anomalies.csv`, 3D Plotly sky map coloured by anomaly score, sidebar filters (date range + min score), demo-data toggle for when the CSV is empty.
+
+### Running nightly_runner
+
+```bash
+# First run: exercise the full pipeline without opening issues.
+.venv/bin/python nightly_runner.py --dry-run
+
+# Production:
+.venv/bin/python nightly_runner.py
+```
+
+Exits when the topic drains (≥6 consecutive empty polls = ~60s idle) or after 30 minutes. Output:
+- One GitHub issue per unique anomalous `objectId` on `Charlie-Neale/Rubin-redshift-anomalie-detector` (label `peculiar-velocity-anomaly`). Dedup against currently-open issues.
+- One row per flagged alert appended to `anomalies.csv` (gitignored).
+
+### Running the dashboard
+
+```bash
+.venv/bin/streamlit run dashboard.py
+```
+
+Opens in your browser (default `http://localhost:8501`). If `anomalies.csv` is empty, toggle **Use demo data** in the sidebar to see the layout with synthetic data.
 
 ---
 
