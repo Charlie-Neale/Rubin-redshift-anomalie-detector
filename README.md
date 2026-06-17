@@ -1,2 +1,3 @@
 # Rubin-redshift-anomalie-detector
-An algorithm to display peculiar galaxies in our local area using data from the Vera Rubin telescope
+An algorithm to display and detect galaxies in our local group undergoing peculiar motion.
+Uses data from Fink broker which is fed from the Vera Rubin telescope.
